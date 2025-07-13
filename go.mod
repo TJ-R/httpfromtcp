@@ -1,4 +1,4 @@
-module TJ-R/httpfromtcp
+module github.com/TJ-R/httpfromtcp
 
 go 1.24.1
 

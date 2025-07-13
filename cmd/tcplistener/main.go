@@ -4,9 +4,7 @@ import (
 	"log"
 	"net"
 	"fmt"
-	"errors"
-	"io"
-	"strings"
+	"github.com/TJ-R/httpfromtcp/internal/request"
 )
 
 func main() {
@@ -19,6 +17,7 @@ func main() {
 	defer l.Close()
 	for {
 		con, err := l.Accept()
+		defer con.Close()
 		
 		if err != nil {
 			log.Printf("Error: %v\n", err)
@@ -26,50 +25,16 @@ func main() {
 
 		log.Print("Connection Accepted")
 
-		for line := range getLinesChannel(con) {
-			fmt.Println(line)
+		parsedRequest, err := request.RequestFromReader(con)
+		if err != nil {
+			log.Fatalf("Error when parsing request: %v\n", err)
 		}
 
-		con.Close()
+		fmt.Printf("Request line:\n")
+		fmt.Printf("- Method: %v\n", parsedRequest.RequestLine.Method)
+		fmt.Printf("- Target: %v\n", parsedRequest.RequestLine.RequestTarget)
+		fmt.Printf("- Version: %v\n", parsedRequest.RequestLine.HttpVersion)
 
 		log.Print("Connection Closed")
 	}
-}
-
-func getLinesChannel(f net.Conn) <- chan string {
-	ch := make(chan string)
-
-	go func() {
-		defer f.Close()
-		defer close(ch)
-		currentLine := ""
-		for {
-			buf := make([]byte, 8)
-			n, err := f.Read(buf) 
-
-			if err != nil {
-				if currentLine != "" {
-					ch <- currentLine
-					currentLine = ""
-				}
-
-				if errors.Is(err, io.EOF) {
-					break
-				}
-
-				fmt.Println(err)
-				return
-			}
-
-			stringArr := strings.Split(string(buf[:n]), "\n")
-			for i := range len(stringArr)-1 {
-				ch <- currentLine + stringArr[i]
-				currentLine = ""
-			}
-
-			currentLine += stringArr[len(stringArr)-1]
-		}
-	}()
-
-	return ch
 }
