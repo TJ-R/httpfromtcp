@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+	"regexp"
 )
 
 type Headers map[string]string
@@ -34,7 +35,15 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 		return 0, false, fmt.Errorf("Invalid spacing in header")
 	}
 
-	fieldName = strings.TrimSpace(fieldName)
+	re, err := regexp.Compile(`^[a-zA-Z0-9!#$%&'*+\-.^_` + "`" + `|~]+$`)
+	if err != nil {
+		return 0, false, fmt.Errorf("Error: %v", err)
+	}
+	if !re.Match(bytes.TrimSpace(headerParts[0])) {
+		return 0, false, fmt.Errorf("Invalid character in header")
+	}
+
+	fieldName = strings.ToLower(strings.TrimSpace(fieldName))
 	fieldValue := bytes.TrimSpace(headerParts[1])
 
 
