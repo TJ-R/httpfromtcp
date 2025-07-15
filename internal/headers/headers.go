@@ -46,8 +46,16 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	fieldName = strings.ToLower(strings.TrimSpace(fieldName))
 	fieldValue := bytes.TrimSpace(headerParts[1])
 
+	mapValue, ok := h[fieldName]
 
-	// Header valid
-	h[fieldName] = string(fieldValue)
+	fmt.Println(mapValue)
+	fmt.Println(ok)
+	
+	if ok{
+		h[fieldName] = mapValue + ", " + string(fieldValue)
+	} else {
+		// Header valid
+		h[fieldName] = string(fieldValue)
+	}
 	return index + 2, false, nil
 }
