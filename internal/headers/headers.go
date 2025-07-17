@@ -14,7 +14,6 @@ func NewHeaders() Headers {
 }
 	
 func (h Headers) Parse(data []byte) (n int, done bool, err error) {
-
 	index := bytes.Index(data, []byte("\r\n"))
 
 	if index == -1 {
@@ -23,7 +22,7 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	
 	if index == 0 {
 		return 0, true, nil
-	}
+	} 
 
 	// Deal with stuff before \r\n
 	headerParts := bytes.SplitN(data[:index], []byte(":"), 2) 
@@ -47,9 +46,6 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	fieldValue := bytes.TrimSpace(headerParts[1])
 
 	mapValue, ok := h[fieldName]
-
-	fmt.Println(mapValue)
-	fmt.Println(ok)
 	
 	if ok{
 		h[fieldName] = mapValue + ", " + string(fieldValue)
@@ -57,5 +53,6 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 		// Header valid
 		h[fieldName] = string(fieldValue)
 	}
+
 	return index + 2, false, nil
 }
