@@ -78,10 +78,11 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 		if err != nil {
 			return 	nil, err
 		}
-
+		
 		copy(buf, buf[bytesParsed:])
-		readToIndex -= bytesParsed	
-		fmt.Printf("Read To Index: %v\n", readToIndex)
+
+
+		readToIndex -= bytesParsed
 	}
 
 	return &newRequest, nil
@@ -89,6 +90,7 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 
 func parseRequestLine(data []byte) (*RequestLine, int, error) {
 	idx := bytes.Index(data, []byte("\r\n"))
+
 	if idx == -1 {
 		return nil, 0, nil
 	}
@@ -99,7 +101,7 @@ func parseRequestLine(data []byte) (*RequestLine, int, error) {
 		return nil, 0, err
 	}
 
-	return requestLine, idx + 2, nil
+	return requestLine, idx+2, nil
 
 }
 
@@ -145,16 +147,14 @@ func (r *Request) parse(data []byte) (int, error) {
 		// Update Request  Line field and change state to headers
 		r.parserState = RequestStateParsingHeaders
 		r.RequestLine = *requestLine
-		return len(data), nil
+		return bytesRead, nil
 	
 	case RequestStateParsingHeaders:
-		fmt.Printf("Len of data: %v\n", len(data))
 		totalBytesParsed := 0
 
 		for r.parserState != Done {
 			n, err := r.parseSingle(data[totalBytesParsed:])	
 
-			//fmt.Printf("Number of bytes parsed: %v\n", n)
 			if err != nil {
 				return 0, fmt.Errorf("Error: %v", err)
 			}
