@@ -7,6 +7,7 @@ import (
 	"errors"
 	"bytes"
 	"github.com/TJ-R/httpfromtcp/internal/headers"
+	"strconv"
 )
 
 const bufferSize = 8
@@ -15,6 +16,7 @@ type Request struct {
 	RequestLine RequestLine
 	parserState ParserState
 	Headers headers.Headers
+	Body []byte
 }
 
 type RequestLine struct {
@@ -27,6 +29,7 @@ type ParserState int
 const (
 	Initialized ParserState = iota
 	RequestStateParsingHeaders
+	RequestStateParsingBody
 	Done
 )
 
@@ -36,6 +39,8 @@ func (p ParserState) String() string {
 		return "Initialized"
 	case RequestStateParsingHeaders:
 		return "Parsing Headers"
+	case RequestStateParsingBody:
+		return "Parsing Body"
 	case Done:
 		return "Done"
 	default:
@@ -65,6 +70,7 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 		bytesRead, err :=  reader.Read(buf[readToIndex:])
 		if err != nil {
 			if errors.Is(err, io.EOF) {
+				fmt.Println(newRequest.Get("Content-Length"))
 				if newRequest.parserState != Done {
 					return nil, fmt.Errorf("Incomplete Request")
 				}
@@ -166,6 +172,37 @@ func (r *Request) parse(data []byte) (int, error) {
 		}
 
 		return totalBytesParsed, nil
+
+	case RequestStateParsingBody:
+		contentLength := r.Get("Content-Length")
+		contentLengthValue, err := strconv.Atoi(contentLength)
+		if err != nil {
+			return 0, fmt.Errorf("Error: Encountered an issue converting content-length to int")
+		}
+
+		fmt.Println(contentLength)
+		if contentLength == "" || contentLengthValue == 0{
+			r.parserState = Done
+			return 0, nil
+		} 
+
+		r.Body = append(r.Body, data...)
+
+		if len(data) == 0 && len(r.Body) < contentLengthValue {
+			return 0, fmt.Errorf("Error: Body is less than content length")
+		}
+		
+		if len(r.Body) > contentLengthValue {
+			return 0, fmt.Errorf("Error: Body is greater than content length")
+		}
+
+		if len(r.Body) == contentLengthValue {
+			r.parserState = Done
+			return 0, nil
+		}
+
+		return len(data), nil
+
 	case Done:
 		return 0, fmt.Errorf("Attempting read data in done state")
 
@@ -182,8 +219,14 @@ func (r *Request) parseSingle(data []byte) (int, error) {
 	}
 
 	if done {
-		r.parserState = Done
-		return bytesParsed, nil
+
+		if r.Get("Content-Length") == "" || r.Get("Content-Length") == "0" {
+			r.parserState = Done
+			return bytesParsed, nil
+		} else {
+			r.parserState = RequestStateParsingBody
+			return bytesParsed+2, nil
+		}
 	}
 
 	if bytesParsed == 0 {
@@ -191,4 +234,13 @@ func (r *Request) parseSingle(data []byte) (int, error) {
 	}
 
 	return bytesParsed, nil
+}
+
+func (r *Request) Get(key string) string {
+	value, ok := r.Headers[strings.ToLower(key)]
+	if !ok {
+		return ""
+	}
+
+	return value
 }
