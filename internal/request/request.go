@@ -70,7 +70,6 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 		bytesRead, err :=  reader.Read(buf[readToIndex:])
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				fmt.Println(newRequest.Get("Content-Length"))
 				if newRequest.parserState != Done {
 					return nil, fmt.Errorf("Incomplete Request")
 				}
@@ -180,7 +179,6 @@ func (r *Request) parse(data []byte) (int, error) {
 			return 0, fmt.Errorf("Error: Encountered an issue converting content-length to int")
 		}
 
-		fmt.Println(contentLength)
 		if contentLength == "" || contentLengthValue == 0{
 			r.parserState = Done
 			return 0, nil

@@ -38,5 +38,6 @@ func main() {
 		for k, v := range parsedRequest.Headers {
 			fmt.Printf("- %v: %v\n", k, v)
 		}
+		fmt.Printf("Body:\n%v", string(parsedRequest.Body))
 	}
 }
