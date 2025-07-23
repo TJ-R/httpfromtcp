@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -28,19 +27,63 @@ func main() {
 	log.Println("Server gracefully stopped")
 }
 
-func handlerFunc(w io.Writer, req *request.Request) *server.HandlerError {
+func handlerFunc(w *response.Writer, req *request.Request) {
 	if req.RequestLine.RequestTarget == "/yourproblem" {
-		return &server.HandlerError{
-			StatusCode: response.StatusClientError,
-			Message: "Your problem is not my problem\n",
-		}
+		w.WriteStatusLine(400)
+		body := 
+`
+<html>
+  <head>
+    <title>400 Bad Request</title>
+  </head>
+  <body>
+    <h1>Bad Request</h1>
+    <p>Your request honestly kinda sucked.</p>
+  </body>
+</html>
+`
+
+		headers := response.GetDefaultHeaders(len(body))
+		headers["content-type"] = "text/html"
+		w.WriteHeaders(headers)
+		w.WriteBody([]byte(body))
 	} else if req.RequestLine.RequestTarget == "/myproblem" {
-		return &server.HandlerError{
-			StatusCode: response.StatusServerError,
-			Message: "Woopsie, my bad\n",
-		}
+		w.WriteStatusLine(500)
+		body := 
+`
+<html>
+  <head>
+    <title>500 Internal Server Error</title>
+  </head>
+  <body>
+    <h1>Bad Request</h1>
+    <p>Okay, you know what? This one is on me.</p>
+  </body>
+</html>
+`
+
+		headers := response.GetDefaultHeaders(len(body))
+		headers["content-type"] = "text/html"
+		w.WriteHeaders(headers)
+		w.WriteBody([]byte(body))
 	} else {
-		w.Write([]byte("All good, frfr\n"))
-		return nil
+		w.WriteStatusLine(200)
+		body := 
+`
+<html>
+  <head>
+    <title>200 OK</title>
+  </head>
+  <body>
+    <h1>Success!</h1>
+    <p>Your request was an absolute banger.</p>
+  </body>
+</html>
+`
+
+		headers := response.GetDefaultHeaders(len(body))
+		headers["content-type"] = "text/html"
+		w.WriteHeaders(headers)
+		w.WriteBody([]byte(body))
 	}
 }

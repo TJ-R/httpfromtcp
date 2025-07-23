@@ -3,32 +3,94 @@ package response
 import (
 	"io"
 	"fmt"
+	"maps"
 	"github.com/TJ-R/httpfromtcp/internal/headers"
 )
 
 type StatusCode int 
+type WriterState int
 
 const (
-	StatusOk StatusCode = iota
-	StatusClientError
-	StatusServerError
+	StatusOk StatusCode = 200
+	StatusClientError   = 400
+	StatusServerError   = 500
 )
 
-func WriteStatusLine(w io.Writer, statusCode StatusCode) error {
-	message := ""
+const (
+	WritingStatus WriterState = iota
+	WritingHeaders
+	WritingBody
+)
 
+
+type Writer struct {
+	W io. Writer
+	writerState WriterState
+	StatusCode StatusCode
+	Headers    headers.Headers
+	Body       []byte
+}
+
+func (writer *Writer) GetStatusLine() {
+
+}
+
+func (writer *Writer) WriteStatusLine(statusCode StatusCode) error {
+	writer.StatusCode = statusCode
+
+	statusReason := ""
 	switch statusCode {
 	case StatusOk:
-		message = "HTTP/1.1 200 OK\r\n"	
-	case StatusClientError: 
-		message = "HTTP/1.1 400 Bad Request\r\n"	
+		statusReason = "OK"
+	case StatusClientError:
+		statusReason = "Bad Request"
 	case StatusServerError:
-		message = "HTTP/1.1 500 Internal Server Error\r\n"	
+		statusReason = "Internal Server Error"
 	default:
-		message = "HTTP/1.1\r\n"	
+		statusReason = "Unknown Status Code"
 	}
 
-	_, err := w.Write([]byte(message))
+	_, err := writer.W.Write([]byte(fmt.Sprintf("HTTP/1.1 %d %s\r\n", writer.StatusCode, statusReason)))
+	if err != nil {
+		return err
+	}
+
+	writer.writerState = WritingHeaders
+
+	return nil
+}
+
+func (writer *Writer) WriteHeaders(newHeaders headers.Headers) error {
+	if writer.writerState != WritingHeaders {
+		return fmt.Errorf("Writing Headers before StatusLine")
+	}
+
+	writer.Headers = headers.NewHeaders() 
+
+	maps.Copy(writer.Headers, newHeaders)
+	
+	for k, v := range writer.Headers {
+		_, err := writer.W.Write([]byte(k + ": " + v + "\r\n"))
+		if err != nil {
+			return err
+		}
+	}
+	
+	_, err := writer.W.Write([]byte("\r\n")) 
+	if err != nil {
+		return err
+	}
+
+	writer.writerState = WritingBody
+	return nil
+}
+
+func (writer *Writer) WriteBody(p []byte) error {
+	if writer.writerState != WritingBody {
+		return fmt.Errorf("Writing Headers before StatusLine")
+	}
+
+	_, err := writer.W.Write(p)
 	if err != nil {
 		return err
 	}
@@ -38,21 +100,11 @@ func WriteStatusLine(w io.Writer, statusCode StatusCode) error {
 
 func GetDefaultHeaders(contentLen int) headers.Headers {
 	headers := headers.NewHeaders()
-	headers["content-length"] = fmt.Sprintf("%d", contentLen)
+	headers["content-length"] = fmt.Sprintf("%v", contentLen)
 	headers["connection"] = "close"
 	headers["content-type"] = "text/plain"
 
 	return headers
 }
 
-func WriteHeaders(w io.Writer, headers headers.Headers) error {
-	for k, v := range headers {
-		_, err := w.Write([]byte(fmt.Sprintf("%s: %s\r\n", k, v)))
-		if err != nil {
-			return err
-		}
-	}
-	
-	w.Write([]byte("\r\n"))
-	return nil
-}
+
