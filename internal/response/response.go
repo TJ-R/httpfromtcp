@@ -1,8 +1,8 @@
 package response
 
 import (
-	"io"
 	"fmt"
+	"io"
 	"maps"
 	"github.com/TJ-R/httpfromtcp/internal/headers"
 )
@@ -87,7 +87,7 @@ func (writer *Writer) WriteHeaders(newHeaders headers.Headers) error {
 
 func (writer *Writer) WriteBody(p []byte) error {
 	if writer.writerState != WritingBody {
-		return fmt.Errorf("Writing Headers before StatusLine")
+		return fmt.Errorf("Writing Body before Headers")
 	}
 
 	_, err := writer.W.Write(p)
@@ -96,6 +96,42 @@ func (writer *Writer) WriteBody(p []byte) error {
 	}
 
 	return nil
+}
+
+func (writer *Writer) WriteChunkedBody(p []byte) (int, error) {
+	if writer.writerState != WritingBody {
+		return 0, fmt.Errorf("Writing Body before Headers")
+	}
+
+	totalBytes := 0
+	n, err := writer.W.Write([]byte(fmt.Sprintf("%x\r\n", len(p))))
+	totalBytes += n
+	if err != nil {
+		return 0, err
+	}
+
+	n, err = writer.W.Write(p)
+	totalBytes += n
+	if err != nil {
+		return 0, err
+	}
+
+	n, err = writer.W.Write([]byte("\r\n"))
+	totalBytes += n
+	if err != nil {
+		return 0, err
+	}
+
+	return n, nil
+}
+
+func (writer *Writer) WriteChunkedBodyDone() (int, error) {
+	_, err := writer.W.Write([]byte("0\r\n\r\n"))
+	if err != nil {
+		return 0, err
+	}
+
+	return 0, nil
 }
 
 func GetDefaultHeaders(contentLen int) headers.Headers {

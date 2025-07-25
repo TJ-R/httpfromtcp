@@ -1,11 +1,13 @@
 package main
 
 import (
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-
+	"strings"
 	"github.com/TJ-R/httpfromtcp/internal/request"
 	"github.com/TJ-R/httpfromtcp/internal/response"
 	"github.com/TJ-R/httpfromtcp/internal/server"
@@ -66,6 +68,46 @@ func handlerFunc(w *response.Writer, req *request.Request) {
 		headers["content-type"] = "text/html"
 		w.WriteHeaders(headers)
 		w.WriteBody([]byte(body))
+	} else if strings.HasPrefix(req.RequestLine.RequestTarget, "/httpbin") {
+
+		path := strings.TrimPrefix(req.RequestLine.RequestTarget, "/httpbin")
+		url := "https://httpbin.org/" + path
+		res, err := http.Get(url)	
+		if err != nil { 
+			log.Println(err)
+		} 
+
+		w.WriteStatusLine(response.StatusOk)
+
+		headers := response.GetDefaultHeaders(0)
+		delete(headers, "content-length")
+        headers["transfer-encoding"] = "chunked" 
+		w.WriteHeaders(headers)
+
+		buf := make([]byte, 32)
+
+		for { 
+			n, err := res.Body.Read(buf)
+			log.Println(n)
+			
+			if n == 0 {
+				w.WriteChunkedBodyDone()
+				break
+			}
+
+			_, err = w.WriteChunkedBody(buf[:n])
+
+			if err == io.EOF {
+				break
+			}
+
+			if err != nil {
+				log.Printf("Error: when reading chunk %v\n", err)
+				break
+			}
+		}
+							
+
 	} else {
 		w.WriteStatusLine(200)
 		body := 
