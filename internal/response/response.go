@@ -20,6 +20,7 @@ const (
 	WritingStatus WriterState = iota
 	WritingHeaders
 	WritingBody
+	WritingTrailers
 )
 
 
@@ -29,6 +30,7 @@ type Writer struct {
 	StatusCode StatusCode
 	Headers    headers.Headers
 	Body       []byte
+	Trailers   headers.Headers
 }
 
 func (writer *Writer) GetStatusLine() {
@@ -122,16 +124,43 @@ func (writer *Writer) WriteChunkedBody(p []byte) (int, error) {
 		return 0, err
 	}
 
-	return n, nil
+	return totalBytes, nil
 }
 
 func (writer *Writer) WriteChunkedBodyDone() (int, error) {
-	_, err := writer.W.Write([]byte("0\r\n\r\n"))
+	_, err := writer.W.Write([]byte("0\r\n"))
 	if err != nil {
 		return 0, err
 	}
 
+	writer.writerState = WritingTrailers
+
 	return 0, nil
+}
+
+func (writer *Writer) WriteTrailers(trailers headers.Headers)  error {
+	if writer.writerState != WritingTrailers {
+		return fmt.Errorf("Incorrect order for response write")
+	}
+
+	writer.Trailers = headers.NewHeaders() 
+
+	maps.Copy(writer.Trailers, trailers)
+	
+	for k, v := range writer.Trailers {
+		_, err := writer.W.Write([]byte(k + ": " + v + "\r\n"))
+		if err != nil {
+			return err
+		}
+	}
+	
+	_, err := writer.W.Write([]byte("\r\n")) 
+	if err != nil {
+		return err
+	}
+
+	return nil
+
 }
 
 func GetDefaultHeaders(contentLen int) headers.Headers {
@@ -141,6 +170,11 @@ func GetDefaultHeaders(contentLen int) headers.Headers {
 	headers["content-type"] = "text/plain"
 
 	return headers
+}
+
+func GetDefaultTrailers() headers.Headers {
+	trailers := headers.NewHeaders()
+	return trailers
 }
 
 

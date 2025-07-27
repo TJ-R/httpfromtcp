@@ -22,10 +22,10 @@ func main() {
 		log.Fatal("Failed to Dial UDP")
 	}
 
-	reader :=  bufio.NewReader(os.Stdin)
+	reader := bufio.NewReader(os.Stdin)
 
 	for {
-		fmt.Print("> ")	
+		fmt.Print("> ")
 		line, err := reader.ReadString('\n')
 
 		if err != nil {
@@ -33,7 +33,7 @@ func main() {
 		}
 
 		_, err = con.Write([]byte(line))
-		
+
 		if err != nil {
 			log.Printf("Error when writing: %v\n", err)
 		}

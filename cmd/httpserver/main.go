@@ -3,11 +3,13 @@ package main
 import (
 	"io"
 	"log"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"strings"
+	"crypto/sha256"
 	"github.com/TJ-R/httpfromtcp/internal/request"
 	"github.com/TJ-R/httpfromtcp/internal/response"
 	"github.com/TJ-R/httpfromtcp/internal/server"
@@ -81,21 +83,26 @@ func handlerFunc(w *response.Writer, req *request.Request) {
 
 		headers := response.GetDefaultHeaders(0)
 		delete(headers, "content-length")
-        headers["transfer-encoding"] = "chunked" 
+        headers["Transfer-Encoding"] = "chunked" 
+		headers["Trailers"] = "X-Content-SHA256, X-Content-Length"
 		w.WriteHeaders(headers)
 
-		buf := make([]byte, 32)
+		buf := make([]byte, 1024)
+		totalBytesBody := 0
+		var respBody []byte
 
 		for { 
 			n, err := res.Body.Read(buf)
-			log.Println(n)
+			respBody = append(respBody, buf[:n]...)
+			totalBytesBody += n
 			
 			if n == 0 {
 				w.WriteChunkedBodyDone()
 				break
 			}
 
-			_, err = w.WriteChunkedBody(buf[:n])
+			n, err = w.WriteChunkedBody(buf[:n])
+
 
 			if err == io.EOF {
 				break
@@ -106,7 +113,32 @@ func handlerFunc(w *response.Writer, req *request.Request) {
 				break
 			}
 		}
-							
+
+		trailers := response.GetDefaultTrailers()
+
+		hash := sha256.Sum256(respBody)
+		trailers["X-Content-SHA256"] = fmt.Sprintf("%x", hash)
+		trailers["X-Content-Length"] = fmt.Sprintf("%d", totalBytesBody)
+
+		err = w.WriteTrailers(trailers)
+		if err != nil {
+			log.Println(err)
+		}
+	} else if req.RequestLine.RequestTarget == "/video" {
+		if err := w.WriteStatusLine(200); err != nil {
+			// Should respond with an internal server error
+			log.Println(err)
+		}	
+
+		body, err := os.ReadFile("./assets/vim.mp4")
+		if err != nil {
+			log.Println(err)
+		}
+
+		headers := response.GetDefaultHeaders(len(body))
+		headers["content-type"] = "video/mp4"
+		w.WriteHeaders(headers)
+		w.WriteBody([]byte(body))
 
 	} else {
 		w.WriteStatusLine(200)
